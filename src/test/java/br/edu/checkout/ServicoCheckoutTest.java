@@ -1,7 +1,11 @@
 package br.edu.checkout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.stream.Stream;
@@ -90,5 +94,21 @@ class ServicoCheckoutTest {
                 Arguments.of("preco negativo",
                         new SolicitacaoCheckout(
                                 "cliente-1", "ana@exemplo.com", "SKU-1", 1, new BigDecimal("-0.01"))));
+    }
+
+    @Test
+    void deveConfirmarCompraAprovadaComTotalDeTresUnidades() {
+        SolicitacaoCheckout solicitacao = new SolicitacaoCheckout(
+                "cliente-1", "ana@exemplo.com", "SKU-1", 3, new BigDecimal("19.90"));
+        BigDecimal total = new BigDecimal("59.70");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(true, "TX-1"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+
+        ResultadoCheckout resultado = servico.finalizar(solicitacao);
+
+        assertEquals(new ResultadoCheckout("PED-1", total, true), resultado);
+        verify(notificador).enviarConfirmacao("ana@exemplo.com", "PED-1", total);
     }
 }
