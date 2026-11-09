@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -185,6 +186,25 @@ class ServicoCheckoutTest {
         ordem.verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
         ordem.verify(estoqueGateway, times(1)).liberar("SKU-1", 3);
         verifyNoInteractions(pedidoRepository, notificador);
+    }
+
+    @Test
+    void deveManterCompraQuandoNotificacaoFalhar() {
+        BigDecimal total = new BigDecimal("59.70");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(true, "TX-1"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+        doThrow(new FalhaNotificacaoException("servidor de e-mail fora do ar"))
+                .when(notificador).enviarConfirmacao("ana@exemplo.com", "PED-1", total);
+
+        ResultadoCheckout resultado = servico.finalizar(solicitacao(3, "19.90"));
+
+        assertEquals(new ResultadoCheckout("PED-1", total, false), resultado);
+        verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
+        verify(pedidoRepository, times(1)).salvar(any(PedidoConfirmado.class));
+        verify(notificador, times(1)).enviarConfirmacao("ana@exemplo.com", "PED-1", total);
+        verify(estoqueGateway, never()).liberar(anyString(), anyInt());
     }
 
     private static SolicitacaoCheckout solicitacao(int quantidade, String precoUnitario) {
