@@ -1,6 +1,7 @@
 package br.edu.checkout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -161,6 +162,24 @@ class ServicoCheckoutTest {
         assertThrows(PagamentoRecusadoException.class,
                 () -> servico.finalizar(solicitacao(3, "19.90")));
 
+        InOrder ordem = inOrder(estoqueGateway, pagamentoGateway);
+        ordem.verify(estoqueGateway, times(1)).reservar("SKU-1", 3);
+        ordem.verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
+        ordem.verify(estoqueGateway, times(1)).liberar("SKU-1", 3);
+        verifyNoInteractions(pedidoRepository, notificador);
+    }
+
+    @Test
+    void deveLiberarReservaEPropagarAMesmaFalhaTecnicaDePagamento() {
+        BigDecimal total = new BigDecimal("59.70");
+        FalhaPagamentoException falha = new FalhaPagamentoException("gateway indisponivel");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total)).thenThrow(falha);
+
+        FalhaPagamentoException propagada = assertThrows(FalhaPagamentoException.class,
+                () -> servico.finalizar(solicitacao(3, "19.90")));
+
+        assertSame(falha, propagada);
         InOrder ordem = inOrder(estoqueGateway, pagamentoGateway);
         ordem.verify(estoqueGateway, times(1)).reservar("SKU-1", 3);
         ordem.verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
