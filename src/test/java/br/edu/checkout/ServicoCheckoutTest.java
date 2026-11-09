@@ -37,7 +37,6 @@ class ServicoCheckoutTest {
 
     @Test
     void deveRejeitarSolicitacaoNulaSemConsultarColaboradores() {
-        // RED inicial: finalizar ainda lança UnsupportedOperationException.
         assertThrows(IllegalArgumentException.class, () -> servico.finalizar(null));
         verifyNoInteractions(
                 estoqueGateway, pagamentoGateway, pedidoRepository, notificador);
