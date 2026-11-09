@@ -24,6 +24,22 @@ public final class ServicoCheckout {
         if (solicitacao == null) {
             throw new IllegalArgumentException("solicitacao nao pode ser nula");
         }
+        if (solicitacao.clienteId() == null || solicitacao.clienteId().isBlank()) {
+            throw new IllegalArgumentException("clienteId obrigatorio");
+        }
+        if (solicitacao.email() == null || solicitacao.email().isBlank()) {
+            throw new IllegalArgumentException("email obrigatorio");
+        }
+        if (solicitacao.sku() == null || solicitacao.sku().isBlank()) {
+            throw new IllegalArgumentException("sku obrigatorio");
+        }
+        if (solicitacao.quantidade() <= 0) {
+            throw new IllegalArgumentException("quantidade deve ser positiva");
+        }
+        if (solicitacao.precoUnitario() == null
+                || solicitacao.precoUnitario().signum() <= 0) {
+            throw new IllegalArgumentException("precoUnitario deve ser positivo");
+        }
         throw new UnsupportedOperationException("Implemente por TDD");
     }
 }
