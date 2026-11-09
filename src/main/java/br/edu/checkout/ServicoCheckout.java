@@ -35,13 +35,7 @@ public final class ServicoCheckout {
                 solicitacao.quantidade(),
                 total,
                 pagamento.transacaoId()));
-        boolean notificacaoEnviada;
-        try {
-            notificador.enviarConfirmacao(solicitacao.email(), numeroPedido, total);
-            notificacaoEnviada = true;
-        } catch (FalhaNotificacaoException falha) {
-            notificacaoEnviada = false;
-        }
+        boolean notificacaoEnviada = notificar(solicitacao.email(), numeroPedido, total);
         return new ResultadoCheckout(numeroPedido, total, notificacaoEnviada);
     }
 
@@ -58,6 +52,15 @@ public final class ServicoCheckout {
             throw new PagamentoRecusadoException();
         }
         return pagamento;
+    }
+
+    private boolean notificar(String email, String numeroPedido, BigDecimal total) {
+        try {
+            notificador.enviarConfirmacao(email, numeroPedido, total);
+            return true;
+        } catch (FalhaNotificacaoException falhaTolerada) {
+            return false;
+        }
     }
 
     private void liberarReserva(SolicitacaoCheckout solicitacao) {
