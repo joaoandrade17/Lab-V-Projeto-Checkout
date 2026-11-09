@@ -139,6 +139,18 @@ class ServicoCheckoutTest {
         verify(estoqueGateway, never()).liberar(anyString(), anyInt());
     }
 
+    @Test
+    void deveRecusarCompraSemEstoqueSemCobrarRegistrarNotificarNemLiberar() {
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(false);
+
+        assertThrows(EstoqueInsuficienteException.class,
+                () -> servico.finalizar(solicitacao(3, "19.90")));
+
+        verify(estoqueGateway, times(1)).reservar("SKU-1", 3);
+        verify(estoqueGateway, never()).liberar(anyString(), anyInt());
+        verifyNoInteractions(pagamentoGateway, pedidoRepository, notificador);
+    }
+
     private static SolicitacaoCheckout solicitacao(int quantidade, String precoUnitario) {
         return new SolicitacaoCheckout(
                 "cliente-1", "ana@exemplo.com", "SKU-1", quantidade, new BigDecimal(precoUnitario));
