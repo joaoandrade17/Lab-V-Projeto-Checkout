@@ -61,6 +61,11 @@ class ServicoCheckoutTest {
                 estoqueGateway, pagamentoGateway, pedidoRepository, notificador);
     }
 
+    private static SolicitacaoCheckout solicitacao(int quantidade, String precoUnitario) {
+        return new SolicitacaoCheckout(
+                "cliente-1", "ana@exemplo.com", "SKU-1", quantidade, new BigDecimal(precoUnitario));
+    }
+
     static Stream<Arguments> solicitacoesInvalidas() {
         BigDecimal preco = new BigDecimal("19.90");
         return Stream.of(
@@ -98,8 +103,7 @@ class ServicoCheckoutTest {
 
     @Test
     void deveConfirmarCompraAprovadaComTotalDeTresUnidades() {
-        SolicitacaoCheckout solicitacao = new SolicitacaoCheckout(
-                "cliente-1", "ana@exemplo.com", "SKU-1", 3, new BigDecimal("19.90"));
+        SolicitacaoCheckout solicitacao = solicitacao(3, "19.90");
         BigDecimal total = new BigDecimal("59.70");
         when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
         when(pagamentoGateway.cobrar("cliente-1", total))
