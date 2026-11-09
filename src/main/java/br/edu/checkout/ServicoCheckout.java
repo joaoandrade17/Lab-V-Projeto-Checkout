@@ -21,18 +21,17 @@ public final class ServicoCheckout {
     }
 
     public ResultadoCheckout finalizar(SolicitacaoCheckout solicitacao) {
+        validar(solicitacao);
+        throw new UnsupportedOperationException("Implemente por TDD");
+    }
+
+    private static void validar(SolicitacaoCheckout solicitacao) {
         if (solicitacao == null) {
             throw new IllegalArgumentException("solicitacao nao pode ser nula");
         }
-        if (solicitacao.clienteId() == null || solicitacao.clienteId().isBlank()) {
-            throw new IllegalArgumentException("clienteId obrigatorio");
-        }
-        if (solicitacao.email() == null || solicitacao.email().isBlank()) {
-            throw new IllegalArgumentException("email obrigatorio");
-        }
-        if (solicitacao.sku() == null || solicitacao.sku().isBlank()) {
-            throw new IllegalArgumentException("sku obrigatorio");
-        }
+        exigirTexto(solicitacao.clienteId(), "clienteId");
+        exigirTexto(solicitacao.email(), "email");
+        exigirTexto(solicitacao.sku(), "sku");
         if (solicitacao.quantidade() <= 0) {
             throw new IllegalArgumentException("quantidade deve ser positiva");
         }
@@ -40,6 +39,11 @@ public final class ServicoCheckout {
                 || solicitacao.precoUnitario().signum() <= 0) {
             throw new IllegalArgumentException("precoUnitario deve ser positivo");
         }
-        throw new UnsupportedOperationException("Implemente por TDD");
+    }
+
+    private static void exigirTexto(String valor, String campo) {
+        if (valor == null || valor.isBlank()) {
+            throw new IllegalArgumentException(campo + " obrigatorio");
+        }
     }
 }
