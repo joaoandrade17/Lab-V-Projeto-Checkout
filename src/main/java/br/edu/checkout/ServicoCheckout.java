@@ -27,17 +27,7 @@ public final class ServicoCheckout {
         if (!estoqueGateway.reservar(solicitacao.sku(), solicitacao.quantidade())) {
             throw new EstoqueInsuficienteException();
         }
-        Pagamento pagamento;
-        try {
-            pagamento = pagamentoGateway.cobrar(solicitacao.clienteId(), total);
-        } catch (FalhaPagamentoException falha) {
-            estoqueGateway.liberar(solicitacao.sku(), solicitacao.quantidade());
-            throw falha;
-        }
-        if (!pagamento.aprovado()) {
-            estoqueGateway.liberar(solicitacao.sku(), solicitacao.quantidade());
-            throw new PagamentoRecusadoException();
-        }
+        Pagamento pagamento = cobrarOuLiberarReserva(solicitacao, total);
         String numeroPedido = pedidoRepository.salvar(new PedidoConfirmado(
                 solicitacao.clienteId(),
                 solicitacao.email(),
@@ -47,6 +37,25 @@ public final class ServicoCheckout {
                 pagamento.transacaoId()));
         notificador.enviarConfirmacao(solicitacao.email(), numeroPedido, total);
         return new ResultadoCheckout(numeroPedido, total, true);
+    }
+
+    private Pagamento cobrarOuLiberarReserva(SolicitacaoCheckout solicitacao, BigDecimal total) {
+        Pagamento pagamento;
+        try {
+            pagamento = pagamentoGateway.cobrar(solicitacao.clienteId(), total);
+        } catch (FalhaPagamentoException falhaTecnica) {
+            liberarReserva(solicitacao);
+            throw falhaTecnica;
+        }
+        if (!pagamento.aprovado()) {
+            liberarReserva(solicitacao);
+            throw new PagamentoRecusadoException();
+        }
+        return pagamento;
+    }
+
+    private void liberarReserva(SolicitacaoCheckout solicitacao) {
+        estoqueGateway.liberar(solicitacao.sku(), solicitacao.quantidade());
     }
 
     private static BigDecimal calcularTotal(SolicitacaoCheckout solicitacao) {
