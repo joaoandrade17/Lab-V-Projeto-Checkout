@@ -3,6 +3,11 @@ package br.edu.checkout;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -16,6 +21,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -36,6 +44,9 @@ class ServicoCheckoutTest {
 
     @Mock
     private Notificador notificador;
+
+    @Captor
+    private ArgumentCaptor<PedidoConfirmado> pedidoCaptor;
 
     private ServicoCheckout servico;
 
@@ -59,6 +70,73 @@ class ServicoCheckoutTest {
         assertThrows(IllegalArgumentException.class, () -> servico.finalizar(invalida));
         verifyNoInteractions(
                 estoqueGateway, pagamentoGateway, pedidoRepository, notificador);
+    }
+
+    @Test
+    void deveAceitarUmaUnidadeMantendoPrecoComoTotal() {
+        BigDecimal preco = new BigDecimal("19.90");
+        when(estoqueGateway.reservar("SKU-1", 1)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", preco))
+                .thenReturn(new Pagamento(true, "TX-1"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+
+        ResultadoCheckout resultado = servico.finalizar(solicitacao(1, "19.90"));
+
+        assertEquals(preco, resultado.total());
+    }
+
+    @Test
+    void deveCalcularTotalSemArredondarPrecoComTresCasas() {
+        BigDecimal total = new BigDecimal("0.015");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(true, "TX-1"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+
+        ResultadoCheckout resultado = servico.finalizar(solicitacao(3, "0.005"));
+
+        // equals de BigDecimal compara escala: 0.02 ou 0.0150 reprovariam aqui.
+        assertEquals(total, resultado.total());
+        verify(pagamentoGateway).cobrar("cliente-1", total);
+        verify(notificador).enviarConfirmacao("ana@exemplo.com", "PED-1", total);
+    }
+
+    @Test
+    void devePersistirPedidoComOsSeisCamposCorretos() {
+        BigDecimal total = new BigDecimal("59.70");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(true, "TX-777"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+
+        servico.finalizar(solicitacao(3, "19.90"));
+
+        verify(pedidoRepository).salvar(pedidoCaptor.capture());
+        PedidoConfirmado salvo = pedidoCaptor.getValue();
+        assertEquals("cliente-1", salvo.clienteId());
+        assertEquals("ana@exemplo.com", salvo.email());
+        assertEquals("SKU-1", salvo.sku());
+        assertEquals(3, salvo.quantidade());
+        assertEquals(total, salvo.total());
+        assertEquals("TX-777", salvo.transacaoId());
+    }
+
+    @Test
+    void deveReservarCobrarSalvarENotificarNessaOrdemSemLiberarEstoque() {
+        BigDecimal total = new BigDecimal("59.70");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(true, "TX-1"));
+        when(pedidoRepository.salvar(any(PedidoConfirmado.class))).thenReturn("PED-1");
+
+        servico.finalizar(solicitacao(3, "19.90"));
+
+        InOrder ordem = inOrder(estoqueGateway, pagamentoGateway, pedidoRepository, notificador);
+        ordem.verify(estoqueGateway, times(1)).reservar("SKU-1", 3);
+        ordem.verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
+        ordem.verify(pedidoRepository, times(1)).salvar(any(PedidoConfirmado.class));
+        ordem.verify(notificador, times(1)).enviarConfirmacao("ana@exemplo.com", "PED-1", total);
+        verify(estoqueGateway, never()).liberar(anyString(), anyInt());
     }
 
     private static SolicitacaoCheckout solicitacao(int quantidade, String precoUnitario) {
