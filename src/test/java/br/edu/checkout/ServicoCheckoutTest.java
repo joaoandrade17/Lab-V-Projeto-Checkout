@@ -151,6 +151,23 @@ class ServicoCheckoutTest {
         verifyNoInteractions(pagamentoGateway, pedidoRepository, notificador);
     }
 
+    @Test
+    void deveLiberarReservaUmaVezQuandoPagamentoForRecusado() {
+        BigDecimal total = new BigDecimal("59.70");
+        when(estoqueGateway.reservar("SKU-1", 3)).thenReturn(true);
+        when(pagamentoGateway.cobrar("cliente-1", total))
+                .thenReturn(new Pagamento(false, null));
+
+        assertThrows(PagamentoRecusadoException.class,
+                () -> servico.finalizar(solicitacao(3, "19.90")));
+
+        InOrder ordem = inOrder(estoqueGateway, pagamentoGateway);
+        ordem.verify(estoqueGateway, times(1)).reservar("SKU-1", 3);
+        ordem.verify(pagamentoGateway, times(1)).cobrar("cliente-1", total);
+        ordem.verify(estoqueGateway, times(1)).liberar("SKU-1", 3);
+        verifyNoInteractions(pedidoRepository, notificador);
+    }
+
     private static SolicitacaoCheckout solicitacao(int quantidade, String precoUnitario) {
         return new SolicitacaoCheckout(
                 "cliente-1", "ana@exemplo.com", "SKU-1", quantidade, new BigDecimal(precoUnitario));
